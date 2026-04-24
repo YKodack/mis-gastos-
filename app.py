@@ -25,8 +25,9 @@ with st.form("registro_gasto", clear_on_submit=True):
     col1, col2 = st.columns(2)
     
     with col1:
+        # Aquí ponemos la fecha en español
         fecha = st.date_input("Fecha", datetime.now())
-        cat = st.selectbox("Categoría", ["Comida", "Transporte", "Estudios", "Cine/Ocio", "Otros"])
+        cat = st.selectbox("Categoría", ["Comida", "Transporte", "Estudios", "Cine/Ocio", "Ventas/Negocio", "Otros"])
     
     with col2:
         monto = st.number_input("Monto ($)", min_value=0.0, step=5.0)
@@ -34,28 +35,33 @@ with st.form("registro_gasto", clear_on_submit=True):
 
     if st.form_submit_button("Guardar Gasto"):
         if monto > 0:
-            nuevo = pd.DataFrame([[fecha.strftime("%Y-%m-%d"), cat, monto, desc]], columns=df.columns)
+            nuevo = pd.DataFrame([[fecha.strftime("%d/%m/%Y"), cat, monto, desc]], columns=df.columns)
             df = pd.concat([df, nuevo], ignore_index=True)
             df.to_csv(ARCHIVO_DATOS, index=False)
-            st.success("¡Gasto guardado!")
+            st.success("¡Gasto guardado con éxito!")
             st.rerun()
+        else:
+            st.error("Por favor, ingresa un monto mayor a 0.")
 
 # --- TABLA Y GRÁFICA ---
 if not df.empty:
     st.divider()
-    st.subheader("📈 Resumen de Gastos")
+    st.subheader("📈 Resumen de mis Gastos")
     
     col_tab, col_gra = st.columns([2, 1])
     
     with col_tab:
-        st.write("**Historial**")
+        st.write("**Historial de Movimientos**")
         st.dataframe(df, use_container_width=True)
-        st.write(f"**Total gastado: ${df['Monto'].sum():,.2f}**")
+        st.write(f"### Total gastado: ${df['Monto'].sum():,.2f}")
     
     with col_gra:
-        st.write("**Distribución**")
+        st.write("**Distribución por Categoría**")
         resumen = df.groupby("Categoría")["Monto"].sum()
         fig, ax = plt.subplots()
+        # Colores bonitos para la gráfica
         resumen.plot(kind='pie', autopct='%1.1f%%', ax=ax, startangle=140)
         ax.set_ylabel("")
         st.pyplot(fig)
+else:
+    st.info("Aún no tienes gastos registrados. ¡Empieza llenando el formulario arriba!")
