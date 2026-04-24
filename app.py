@@ -4,79 +4,83 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 
-# Configuración de la página
-st.set_page_config(page_title="Mi Contabilidad Personal", page_icon="💰")
+st.set_page_config(page_title="Mi Contabilidad Total", page_icon="💰", layout="wide")
 
-st.title("📊 Mi Control de Gastos")
+st.title("🏦 Mi Gestión Financiera")
 st.markdown("---")
 
-# Archivo donde se guardan los datos
-ARCHIVO_DATOS = "mis_gastos.csv"
+# Archivos de datos
+ARCHIVO_GASTOS = "mis_gastos.csv"
+ARCHIVO_INGRESOS = "mis_ingresos.csv"
 
-# Cargar datos existentes
-if os.path.exists(ARCHIVO_DATOS):
-    df = pd.read_csv(ARCHIVO_DATOS)
-else:
-    df = pd.DataFrame(columns=["Fecha", "Categoría", "Monto", "Descripción"])
+# Funciones para cargar datos
+def cargar_datos(nombre_archivo, columnas):
+    if os.path.exists(nombre_archivo):
+        return pd.read_csv(nombre_archivo)
+    else:
+        return pd.DataFrame(columns=columnas)
 
-# --- FORMULARIO PARA METER DATOS ---
-with st.form("registro_gasto", clear_on_submit=True):
-    st.subheader("📝 Registrar nuevo gasto")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fecha = st.date_input("Fecha", datetime.now())
-        cat = st.selectbox("Categoría", ["Comida", "Transporte", "Estudios", "Cine/Ocio", "Ventas/Negocio", "Otros"])
-    
-    with col2:
-        monto = st.number_input("Monto ($)", min_value=0.0, step=5.0)
+df_gastos = cargar_datos(ARCHIVO_GASTOS, ["Fecha", "Categoría", "Descripción", "Monto"])
+df_ingresos = cargar_datos(ARCHIVO_INGRESOS, ["Fecha", "Fuente", "Monto"])
+
+# --- SECCIÓN DE ENTRADA (INGRESOS Y GASTOS) ---
+col_in, col_ga = st.columns(2)
+
+with col_in:
+    with st.form("form_ingreso", clear_on_submit=True):
+        st.subheader("💵 Registrar Ingreso Mensual")
+        f_ing = st.date_input("Fecha Ingreso", datetime.now())
+        fuente = st.text_input("Fuente (ej. Sueldo Cine, Ventas, Beca)")
+        monto_ing = st.number_input("Monto Recibido ($)", min_value=0.0, step=100.0)
+        if st.form_submit_button("Añadir Ingreso"):
+            nuevo_i = pd.DataFrame([[f_ing.strftime("%d/%m/%Y"), fuente, monto_ing]], columns=df_ingresos.columns)
+            df_ingresos = pd.concat([df_ingresos, nuevo_i], ignore_index=True)
+            df_ingresos.to_csv(ARCHIVO_INGRESOS, index=False)
+            st.success("Ingreso guardado")
+            st.rerun()
+
+with col_ga:
+    with st.form("form_gasto", clear_on_submit=True):
+        st.subheader("💸 Registrar Gasto")
+        f_gas = st.date_input("Fecha Gasto", datetime.now())
+        cat = st.selectbox("Categoría", ["Comida", "Transporte", "Estudios", "Cine/Ocio", "Ventas", "Otros"])
         desc = st.text_input("¿En qué gastaste?")
-
-    if st.form_submit_button("Guardar Gasto"):
-        if monto > 0:
-            nuevo = pd.DataFrame([[fecha.strftime("%d/%m/%Y"), cat, monto, desc]], columns=df.columns)
-            df = pd.concat([df, nuevo], ignore_index=True)
-            df.to_csv(ARCHIVO_DATOS, index=False)
-            st.success("¡Gasto guardado!")
+        monto_gas = st.number_input("Monto Gastado ($)", min_value=0.0, step=10.0)
+        if st.form_submit_button("Añadir Gasto"):
+            nuevo_g = pd.DataFrame([[f_gas.strftime("%d/%m/%Y"), cat, desc, monto_gas]], columns=df_gastos.columns)
+            df_gastos = pd.concat([df_gastos, nuevo_g], ignore_index=True)
+            df_gastos.to_csv(ARCHIVO_GASTOS, index=False)
+            st.success("Gasto guardado")
             st.rerun()
 
-# --- SECCIÓN PARA BORRAR ---
-if not df.empty:
-    st.divider()
-    st.subheader("⚙️ Administrar Historial")
-    col_b1, col_b2 = st.columns(2)
-    
-    with col_b1:
-        if st.button("🗑️ Borrar ÚLTIMO registro"):
-            df = df[:-1] # Quita la última fila
-            df.to_csv(ARCHIVO_DATOS, index=False)
-            st.warning("Se eliminó el último registro.")
-            st.rerun()
-            
-    with col_b2:
-        if st.button("❗ Limpiar TODO el historial"):
-            if os.path.exists(ARCHIVO_DATOS):
-                os.remove(ARCHIVO_DATOS)
-                st.error("Todo el historial ha sido borrado.")
-                st.rerun()
+# --- BALANCE TOTAL ---
+st.divider()
+total_ingresos = df_ingresos["Monto"].sum()
+total_gastos = df_gastos["Monto"].sum()
+balance = total_ingresos - total_gastos
 
-    # --- TABLA Y GRÁFICA ---
-    st.divider()
-    st.subheader("📈 Resumen de mis Gastos")
-    
-    col_tab, col_gra = st.columns([2, 1])
-    
-    with col_tab:
-        st.write("**Historial de Movimientos**")
-        st.dataframe(df, use_container_width=True)
-        st.write(f"### Total gastado: ${df['Monto'].sum():,.2f}")
-    
-    with col_gra:
-        st.write("**Distribución por Categoría**")
-        resumen = df.groupby("Categoría")["Monto"].sum()
-        fig, ax = plt.subplots()
-        resumen.plot(kind='pie', autopct='%1.1f%%', ax=ax, startangle=140)
-        ax.set_ylabel("")
-        st.pyplot(fig)
-else:
-    st.info("Aún no tienes gastos registrados.")
+c1, c2, c3 = st.columns(3)
+c1.metric("Total Ingresos", f"${total_ingresos:,.2f}")
+c2.metric("Total Gastos", f"- ${total_gastos:,.2f}", delta_color="inverse")
+c3.metric("Disponible Real", f"${balance:,.2f}")
+
+# --- TABLAS EDITABLES ---
+st.divider()
+st.subheader("📝 Desglose y Edición de Cuentas")
+st.info("Puedes hacer doble clic en cualquier celda para editar el texto o el monto. Al terminar, los cambios se reflejan en el balance.")
+
+col_tab1, col_tab2 = st.columns(2)
+
+with col_tab1:
+    st.write("**Tabla de Ingresos**")
+    # Tabla editable
+    df_ingresos_edit = st.data_editor(df_ingresos, num_rows="dynamic", key="edit_ing", use_container_width=True)
+    if st.button("💾 Guardar Cambios Ingresos"):
+        df_ingresos_edit.to_csv(ARCHIVO_INGRESOS, index=False)
+        st.success("¡Tabla de ingresos actualizada!")
+        st.rerun()
+
+with col_tab2:
+    st.write("**Tabla de Gastos**")
+    # Tabla editable
+    df_gastos_edit = st.data_editor(df_gastos, num_rows="dynamic", key="edit_gas", use_
