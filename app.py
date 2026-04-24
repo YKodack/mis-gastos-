@@ -25,7 +25,6 @@ with st.form("registro_gasto", clear_on_submit=True):
     col1, col2 = st.columns(2)
     
     with col1:
-        # Aquí ponemos la fecha en español
         fecha = st.date_input("Fecha", datetime.now())
         cat = st.selectbox("Categoría", ["Comida", "Transporte", "Estudios", "Cine/Ocio", "Ventas/Negocio", "Otros"])
     
@@ -38,13 +37,30 @@ with st.form("registro_gasto", clear_on_submit=True):
             nuevo = pd.DataFrame([[fecha.strftime("%d/%m/%Y"), cat, monto, desc]], columns=df.columns)
             df = pd.concat([df, nuevo], ignore_index=True)
             df.to_csv(ARCHIVO_DATOS, index=False)
-            st.success("¡Gasto guardado con éxito!")
+            st.success("¡Gasto guardado!")
             st.rerun()
-        else:
-            st.error("Por favor, ingresa un monto mayor a 0.")
 
-# --- TABLA Y GRÁFICA ---
+# --- SECCIÓN PARA BORRAR ---
 if not df.empty:
+    st.divider()
+    st.subheader("⚙️ Administrar Historial")
+    col_b1, col_b2 = st.columns(2)
+    
+    with col_b1:
+        if st.button("🗑️ Borrar ÚLTIMO registro"):
+            df = df[:-1] # Quita la última fila
+            df.to_csv(ARCHIVO_DATOS, index=False)
+            st.warning("Se eliminó el último registro.")
+            st.rerun()
+            
+    with col_b2:
+        if st.button("❗ Limpiar TODO el historial"):
+            if os.path.exists(ARCHIVO_DATOS):
+                os.remove(ARCHIVO_DATOS)
+                st.error("Todo el historial ha sido borrado.")
+                st.rerun()
+
+    # --- TABLA Y GRÁFICA ---
     st.divider()
     st.subheader("📈 Resumen de mis Gastos")
     
@@ -59,9 +75,8 @@ if not df.empty:
         st.write("**Distribución por Categoría**")
         resumen = df.groupby("Categoría")["Monto"].sum()
         fig, ax = plt.subplots()
-        # Colores bonitos para la gráfica
         resumen.plot(kind='pie', autopct='%1.1f%%', ax=ax, startangle=140)
         ax.set_ylabel("")
         st.pyplot(fig)
 else:
-    st.info("Aún no tienes gastos registrados. ¡Empieza llenando el formulario arriba!")
+    st.info("Aún no tienes gastos registrados.")
