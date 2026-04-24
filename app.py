@@ -34,11 +34,11 @@ tipo = st.sidebar.radio("¿Qué quieres registrar?", ["Gasto", "Ingreso", "Deuda
 if tipo == "Ingreso":
     with st.sidebar.form("f_ing"):
         f = st.date_input("Fecha")
-        src = st.text_input("Fuente (Sueldo, Venta, etc.)")
+        src = st.text_input("Fuente (Sueldo Cine, Ventas, etc.)")
         m = st.number_input("Cantidad ($)", min_value=0.0)
         if st.form_submit_button("Guardar Ingreso"):
             nuevo = pd.DataFrame([[f.strftime("%d/%m/%Y"), src, m]], columns=df_ingresos.columns)
-            pd.concat([df_ingresos, nuevo]).to_csv(ARCHIVOS["ingresos"], index=False)
+            pd.concat([df_ingresos, nuevo], ignore_index=True).to_csv(ARCHIVOS["ingresos"], index=False)
             st.rerun()
 
 elif tipo == "Gasto":
@@ -49,75 +49,8 @@ elif tipo == "Gasto":
         m = st.number_input("Cantidad ($)", min_value=0.0)
         if st.form_submit_button("Guardar Gasto"):
             nuevo = pd.DataFrame([[f.strftime("%d/%m/%Y"), cat, desc, m]], columns=df_gastos.columns)
-            pd.concat([df_gastos, nuevo]).to_csv(ARCHIVOS["gastos"], index=False)
+            pd.concat([df_gastos, nuevo], ignore_index=True).to_csv(ARCHIVOS["gastos"], index=False)
             st.rerun()
 
 else:
-    with st.sidebar.form("f_deu"):
-        persona = st.text_input("¿A quién le debes?")
-        con = st.text_input("¿Por qué?")
-        m = st.number_input("Monto de la deuda ($)", min_value=0.0)
-        est = st.selectbox("Estado", ["Pendiente", "Pagado"])
-        if st.form_submit_button("Guardar Deuda"):
-            nuevo = pd.DataFrame([[persona, con, m, est]], columns=df_deudas.columns)
-            pd.concat([df_deudas, nuevo]).to_csv(ARCHIVOS["deudas"], index=False)
-            st.rerun()
-
-# --- DASHBOARD PRINCIPAL ---
-total_ing = df_ingresos["Monto"].sum()
-total_gas = df_gastos["Monto"].sum()
-# Solo sumamos las deudas que dicen "Pendiente"
-total_deu = df_deudas[df_deudas["Estado"] == "Pendiente"]["Monto"].sum()
-saldo_real = total_ing - total_gas
-
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("💰 Total Ingresos", f"${total_ing:,.2f}")
-col2.metric("💸 Total Gastos", f"${total_gas:,.2f}")
-col3.metric("⚠️ Debes (Pendiente)", f"${total_deu:,.2f}", delta_color="inverse")
-col4.metric("⚖️ Saldo Actual", f"${saldo_real:,.2f}")
-
-st.divider()
-
-# --- SECCIÓN DE ADMINISTRACIÓN ---
-st.subheader("📝 Gestión de Tablas y Gráficas")
-t1, t2, t3 = st.tabs(["📊 Gráficas de Control", "🧾 Ver Ingresos y Gastos", "🚩 Control de Deudas"])
-
-with t1:
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        st.write("**Distribución de Gastos**")
-        if not df_gastos.empty:
-            res = df_gastos.groupby("Categoría")["Monto"].sum()
-            fig, ax = plt.subplots()
-            res.plot(kind='pie', autopct='%1.1f%%', ax=ax, colors=plt.cm.Pastel1.colors)
-            st.pyplot(fig)
-    with col_g2:
-        st.write("**Estado de Deudas**")
-        if not df_deudas.empty:
-            res_d = df_deudas.groupby("Estado")["Monto"].sum()
-            fig2, ax2 = plt.subplots()
-            res_d.plot(kind='bar', color=['red', 'green'], ax=ax2)
-            st.pyplot(fig2)
-
-with t2:
-    st.info("Puedes editar los montos directamente en la tabla y dar clic en 'Sincronizar'")
-    c_i, c_g = st.columns(2)
-    with c_i:
-        st.write("**Tabla de Ingresos**")
-        ed_i = st.data_editor(df_ingresos, num_rows="dynamic", key="i_ed", use_container_width=True)
-        if st.button("Sincronizar Ingresos"):
-            ed_i.to_csv(ARCHIVOS["ingresos"], index=False)
-            st.rerun()
-    with c_g:
-        st.write("**Tabla de Gastos**")
-        ed_g = st.data_editor(df_gastos, num_rows="dynamic", key="g_ed", use_container_width=True)
-        if st.button("Sincronizar Gastos"):
-            ed_g.to_csv(ARCHIVOS["gastos"], index=False)
-            st.rerun()
-
-with t3:
-    st.write("**Listado de Cuentas por Pagar**")
-    ed_d = st.data_editor(df_deudas, num_rows="dynamic", key="d_ed", use_container_width=True)
-    if st.button("Actualizar Deudas"):
-        ed_d.to_csv(ARCHIVOS["deudas"], index=False)
-        st.rerun()
+    with st.
