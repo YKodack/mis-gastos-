@@ -1,105 +1,111 @@
-iimport streamlit as st
+import streamlit as st
 import pandas as pd
-import plotly.express as px # Usaremos Plotly para gráficas más interactivas
+import plotly.express as px
 import os
 from datetime import datetime
 
-# Configuración de pantalla ancha y estilo
+# Configuración profesional
 st.set_page_config(page_title="Mi Wallet Inteligente", page_icon="💳", layout="wide")
 
-# --- ESTILO PERSONALIZADO ---
+# Estilo visual
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e6e9ef; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🚀 Mi Panel de Control Financiero")
-st.write(f"Hola, hoy es {datetime.now().strftime('%d de %B, %Y')}")
 
 # --- ARCHIVOS ---
-ARCHIVOS = {"datos": "contabilidad_completa.csv"}
+ARCHIVO = "contabilidad_total.csv"
 
 def cargar_datos():
-    if os.path.exists(ARCHIVOS["datos"]):
-        return pd.read_csv(ARCHIVOS["datos"])
+    if os.path.exists(ARCHIVO):
+        return pd.read_csv(ARCHIVO)
     return pd.DataFrame(columns=["Fecha", "Tipo", "Categoría", "Descripción", "Monto"])
 
 df = cargar_datos()
 
-# --- BARRA LATERAL: ENTRADA RÁPIDA ---
-st.sidebar.header("🎯 Registrar Movimiento")
-with st.sidebar.form("registro_rapido", clear_on_submit=True):
-    tipo = st.selectbox("¿Qué es?", ["Gasto", "Ingreso"])
+# --- REGISTRO LATERAL ---
+st.sidebar.header("🎯 Nuevo Movimiento")
+with st.sidebar.form("registro", clear_on_submit=True):
+    tipo = st.selectbox("Tipo", ["Gasto", "Ingreso"])
     cat = st.selectbox("Categoría", [
         "Sueldo Cine", "Ventas Snacks", "Comida", "Facultad", 
-        "Viajes/Transporte", "Cine/Ocio", "Deudas", "Otros"
+        "Viajes", "Cine/Ocio", "Deudas", "Otros"
     ])
-    desc = st.text_input("Detalle (ej. Uber, Venta gomitas, Tacos)")
-    monto = st.number_input("Cantidad ($)", min_value=0.0, step=10.0)
+    desc = st.text_input("Descripción")
+    monto = st.number_input("Monto ($)", min_value=0.0, step=10.0)
     fecha = st.date_input("Fecha", datetime.now())
     
-    if st.form_submit_button("Añadir a mi cuenta"):
+    if st.form_submit_button("Guardar"):
         nuevo = pd.DataFrame([[fecha.strftime("%Y-%m-%d"), tipo, cat, desc, monto]], columns=df.columns)
         df = pd.concat([df, nuevo], ignore_index=True)
-        df.to_csv(ARCHIVOS["datos"], index=False)
-        st.toast("¡Registro guardado!", icon="✅")
+        df.to_csv(ARCHIVO, index=False)
+        st.toast("¡Guardado!", icon="✅")
         st.rerun()
 
-# --- PANEL DE CONTROL (MÉTRICAS) ---
+# --- MÉTRICAS ---
 total_ing = df[df["Tipo"] == "Ingreso"]["Monto"].sum()
 total_gas = df[df["Tipo"] == "Gasto"]["Monto"].sum()
 balance = total_ing - total_gas
 
-col1, col2, col3 = st.columns(3)
-col1.metric("💰 Entradas Totales", f"${total_ing:,.2f}")
-col2.metric("💸 Salidas Totales", f"${total_gas:,.2f}", delta=f"-{total_gas:,.2f}", delta_color="inverse")
-col3.metric("⚖️ Disponible", f"${balance:,.2f}")
+c1, c2, c3 = st.columns(3)
+c1.metric("💰 Ingresos", f"${total_ing:,.2f}")
+c2.metric("💸 Gastos", f"${total_gas:,.2f}")
+c3.metric("⚖️ Disponible", f"${balance:,.2f}")
 
 st.divider()
 
-# --- SECCIONES INTERACTIVAS ---
-tab1, tab2, tab3 = st.tabs(["📊 Análisis Visual", "📑 Libro Contable", "✈️ Planificador de Viajes"])
+# --- PESTAÑAS INTERACTIVAS ---
+tab1, tab2, tab3 = st.tabs(["📊 Gráficas", "📑 Libro Contable", "✈️ Viajes"])
 
 with tab1:
-    st.subheader("¿A dónde se va mi dinero?")
     if not df[df["Tipo"] == "Gasto"].empty:
         col_g1, col_g2 = st.columns(2)
-        
         with col_g1:
-            # Gráfica de Pastel Interactiva
-            df_gastos = df[df["Tipo"] == "Gasto"]
-            fig_pie = px.pie(df_gastos, values='Monto', names='Categoría', 
-                           title='Gastos por Categoría', hole=0.4,
-                           color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_pie = px.pie(df[df["Tipo"] == "Gasto"], values='Monto', names='Categoría', 
+                           title='¿En qué gasto más?', hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
-            
         with col_g2:
-            # Gráfica de Barras de tiempo
-            fig_bar = px.bar(df_gastos, x='Fecha', y='Monto', color='Categoría',
-                            title='Mis Gastos en el Tiempo', barmode='group')
+            fig_bar = px.bar(df[df["Tipo"] == "Gasto"], x='Categoría', y='Monto', 
+                            title='Gastos por Categoría', color='Categoría')
             st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        st.info("Aún no hay gastos para graficar. ¡Registra uno en la izquierda!")
+        st.info("Registra un gasto para ver el análisis.")
 
 with tab2:
-    st.subheader("Historial Editable")
-    st.write("Haz doble clic en cualquier celda para corregir un dato y luego guarda los cambios.")
-    df_editado = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="editor_principal")
+    st.subheader("Historial de Cuentas")
+    st.write("Puedes editar cualquier celda directamente.")
     
-    if st.button("💾 Sincronizar mis cuentas"):
-        df_editado.to_csv(ARCHIVOS["datos"], index=False)
-        st.success("¡Contabilidad actualizada!")
-        st.rerun()
+    # Tabla editable
+    df_edit = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="main_editor")
+    
+    col_b1, col_b2 = st.columns([1, 4])
+    with col_b1:
+        if st.button("💾 Guardar Cambios"):
+            df_edit.to_csv(ARCHIVO, index=False)
+            st.success("¡Sincronizado!")
+            st.rerun()
+    
+    st.markdown("---")
+    st.subheader("🗑️ Zona de Borrado")
+    if not df.empty:
+        if st.button("❌ Borrar ÚLTIMO registro"):
+            df = df[:-1]
+            df.to_csv(ARCHIVO, index=False)
+            st.warning("Último movimiento eliminado.")
+            st.rerun()
+    else:
+        st.write("No hay nada que borrar todavía.")
 
 with tab3:
-    st.subheader("Presupuesto para Viajes")
-    gastos_viaje = df[df["Categoría"] == "Viajes/Transporte"]["Monto"].sum()
-    st.write(f"Has gastado **${gastos_viaje:,.2f}** en viajes hasta ahora.")
+    st.subheader("Plan de Viajes")
+    presupuesto = st.number_input("¿Cuánto quieres juntar para tu viaje?", min_value=0.0, value=2000.0)
+    gastado_viaje = df[df["Categoría"] == "Viajes"]["Monto"].sum()
+    st.write(f"Has gastado **${gastado_viaje:,.2f}** en viajes.")
     
-    meta_viaje = st.number_input("Meta de ahorro para próximo viaje ($)", min_value=0.0, value=2000.0)
-    progreso = min(balance / meta_viaje, 1.0) if meta_viaje > 0 else 0
-    
-    st.progress(progreso)
-    st.write(f"Llevas el **{progreso*100:.1f}%** de tu meta de ahorro basándote en tu disponible actual.")
+    if presupuesto > 0:
+        progreso = min(max(balance / presupuesto, 0.0), 1.0)
+        st.progress(progreso)
+        st.write(f"Tu disponible actual cubre el **{progreso*100:.1f}%** de tu meta.")
