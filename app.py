@@ -4,105 +4,84 @@ import plotly.express as px
 import os
 from datetime import datetime
 
-# Configuración de la página
-st.set_page_config(page_title="Mi Control Financiero", page_icon="💳", layout="wide")
+# Configuración visual
+st.set_page_config(page_title="Mi Contador de Dinero", page_icon="⚡", layout="wide")
 
-# Estilo para que parezca una App moderna
 st.markdown("""
     <style>
-    .main { background-color: #f0f2f6; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 5px solid #2196f3; }
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #1e3a8a; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("📱 Mi Administrador de Dinero")
-st.write(f"Resumen al día: **{datetime.now().strftime('%d/%m/%Y')}**")
+st.title("⚡ Control de Dinero Rápido")
 
-# --- ARCHIVO DE DATOS ---
-ARCHIVO = "mis_cuentas.csv"
+# --- BASE DE DATOS ---
+ARCHIVO = "mi_dinero.csv"
 
 def cargar_datos():
     if os.path.exists(ARCHIVO):
         return pd.read_csv(ARCHIVO)
-    return pd.DataFrame(columns=["Fecha", "Tipo", "Categoría", "Detalle", "Monto"])
+    return pd.DataFrame(columns=["Fecha", "Concepto", "Monto", "Tipo"])
 
 df = cargar_datos()
 
-# --- 1. RESUMEN RÁPIDO (TARJETAS) ---
-ingresos_t = df[df["Tipo"] == "Ingreso"]["Monto"].sum()
-gastos_t = df[df["Tipo"] == "Gasto"]["Monto"].sum()
-disponible = ingresos_t - gastos_t
+# --- PANEL DE SALDO (LO QUE TE QUEDA) ---
+ingresos = df[df["Tipo"] == "Ingreso"]["Monto"].sum()
+gastos = df[df["Tipo"] == "Gasto"]["Monto"].sum()
+saldo_actual = ingresos - gastos
 
-c1, c2, c3 = st.columns(3)
-c1.metric("💰 Entradas (Ingresos)", f"${ingresos_t:,.2f}")
-c2.metric("💸 Salidas (Gastos)", f"${gastos_t:,.2f}")
-c3.metric("⚖️ Saldo Disponible", f"${disponible:,.2f}")
+st.subheader("💰 Mi Saldo Disponible")
+st.metric(label="Dinero en la bolsa", value=f"${saldo_actual:,.2f}", delta=f"Gastado: -${gastos:,.2f}", delta_color="inverse")
 
 st.divider()
 
-# --- 2. REGISTRO FÁCIL (COLUMNA IZQUIERDA) Y GRÁFICA (DERECHA) ---
-col_form, col_graph = st.columns([1, 1.5])
+# --- ENTRADA RÁPIDA ---
+col_form, col_espacio = st.columns([1, 1])
 
 with col_form:
-    st.subheader("➕ Nuevo Registro")
-    with st.form("registro", clear_on_submit=True):
-        tipo = st.radio("Tipo:", ["Gasto", "Ingreso"], horizontal=True)
-        cat = st.selectbox("Categoría:", [
-            "Sueldo Cine", "Venta Snacks", "Comida", "Facultad", 
-            "Viajes", "Cine/Ocio", "Deudas", "Otros"
-        ])
-        det = st.text_input("¿En qué o de dónde?")
-        mon = st.number_input("Cantidad ($):", min_value=0.0, step=10.0)
-        fec = st.date_input("Fecha:", datetime.now())
+    st.subheader("📝 ¿Qué pasó hoy?")
+    with st.form("entrada_rapida", clear_on_submit=True):
+        tipo_mov = st.radio("Elige uno:", ["Gasto 💸", "Ingreso 💵"], horizontal=True)
+        concepto = st.text_input("¿Qué fue? (ej: Nómina, Uber, Comida)", placeholder="Escribe aquí...")
+        monto = st.number_input("¿Cuánto dinero? ($)", min_value=0.0, step=1.0)
         
-        if st.form_submit_button("Añadir a la lista"):
-            nuevo = pd.DataFrame([[fec.strftime("%Y-%m-%d"), tipo, cat, det, mon]], columns=df.columns)
+        if st.form_submit_button("¡Registrar ahora!"):
+            tipo_final = "Ingreso" if "💵" in tipo_mov else "Gasto"
+            nuevo = pd.DataFrame([[datetime.now().strftime("%d/%m/%Y"), concepto, monto, tipo_final]], 
+                                columns=df.columns)
             df = pd.concat([df, nuevo], ignore_index=True)
             df.to_csv(ARCHIVO, index=False)
-            st.success("¡Guardado!")
+            st.success(f"Registrado: {concepto} por ${monto}")
             st.rerun()
 
-with col_graph:
-    st.subheader("📊 Gráfica Interactiva")
+# --- TABLA Y GRÁFICA (SE ACTUALIZAN SOLAS) ---
+st.divider()
+col_tab, col_gra = st.columns([1.2, 1])
+
+with col_tab:
+    st.subheader("📋 Mi Historial")
+    # Tabla estilo Excel para editar o borrar
+    df_editado = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="editor")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("💾 Guardar cambios / Borrar filas"):
+            df_editado.to_csv(ARCHIVO, index=False)
+            st.rerun()
+    with c2:
+        if st.button("🗑️ Resetear todo (Cero)"):
+            if os.path.exists(ARCHIVO):
+                os.remove(ARCHIVO)
+                st.rerun()
+
+with col_gra:
+    st.subheader("📊 Mis Gastos")
     if not df[df["Tipo"] == "Gasto"].empty:
         df_g = df[df["Tipo"] == "Gasto"]
-        # Gráfica de pastel interactiva
-        fig = px.pie(df_g, values='Monto', names='Categoría', 
-                     hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+        fig = px.pie(df_g, values='Monto', names='Concepto', hole=0.5,
+                     color_discrete_sequence=px.colors.qualitative.Pastel)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Aquí aparecerá tu gráfica de pastel cuando registres gastos.")
-
-# --- 3. TABLA ESTILO EXCEL (EDITABLE) ---
-st.divider()
-st.subheader("📝 Tu Historial (Estilo Excel)")
-st.write("Haz doble clic en cualquier número o texto para cambiarlo. Al terminar, dale al botón de abajo.")
-
-# El editor de datos permite borrar filas seleccionándolas y dando a la tecla 'Supr' o 'Delete'
-df_editado = st.data_editor(
-    df, 
-    num_rows="dynamic", 
-    use_container_width=True, 
-    key="editor_excel",
-    column_config={
-        "Tipo": st.column_config.SelectboxColumn("Tipo", options=["Ingreso", "Gasto"]),
-        "Categoría": st.column_config.SelectboxColumn("Categoría", options=[
-            "Sueldo Cine", "Venta Snacks", "Comida", "Facultad", "Viajes", "Cine/Ocio", "Deudas", "Otros"
-        ])
-    }
-)
-
-col_b1, col_b2 = st.columns([1, 4])
-with col_b1:
-    if st.button("💾 Guardar cambios"):
-        df_editado.to_csv(ARCHIVO, index=False)
-        st.success("¡Cuentas actualizadas!")
-        st.rerun()
-
-with col_b2:
-    if st.button("🗑️ Borrar TODO"):
-        if os.path.exists(ARCHIVO):
-            os.remove(ARCHIVO)
-            st.error("Se borró todo el historial.")
-            st.rerun()
+        st.info("No hay gastos todavía.")
