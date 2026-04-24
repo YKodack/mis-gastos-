@@ -62,22 +62,33 @@ c1.metric("Total Ingresos", f"${total_ingresos:,.2f}")
 c2.metric("Total Gastos", f"- ${total_gastos:,.2f}")
 c3.metric("Disponible Real", f"${balance:,.2f}")
 
-# --- TABLAS EDITABLES ---
+# --- TABLAS EDITABLES Y GRÁFICA ---
 st.divider()
-st.subheader("📝 Edición Directa de Cuentas")
+st.subheader("📝 Edición Directa y Análisis")
 
-col_tab1, col_tab2 = st.columns(2)
+col_tab1, col_tab2, col_gra = st.columns([1.5, 1.5, 1.2])
 
 with col_tab1:
-    st.write("**Ingresos**")
+    st.write("**Historial de Ingresos**")
     df_ing_edit = st.data_editor(df_ingresos, num_rows="dynamic", key="ed_ing", use_container_width=True)
     if st.button("💾 Guardar Ingresos"):
         df_ing_edit.to_csv(ARCHIVO_INGRESOS, index=False)
         st.rerun()
 
 with col_tab2:
-    st.write("**Gastos**")
+    st.write("**Historial de Gastos**")
     df_gas_edit = st.data_editor(df_gastos, num_rows="dynamic", key="ed_gas", use_container_width=True)
     if st.button("💾 Guardar Gastos"):
         df_gas_edit.to_csv(ARCHIVO_GASTOS, index=False)
         st.rerun()
+
+with col_gra:
+    st.write("**Distribución de Gastos**")
+    if not df_gastos.empty:
+        resumen = df_gastos.groupby("Categoría")["Monto"].sum()
+        fig, ax = plt.subplots()
+        resumen.plot(kind='pie', autopct='%1.1f%%', ax=ax, startangle=140, colors=plt.cm.Paired.colors)
+        ax.set_ylabel("")
+        st.pyplot(fig)
+    else:
+        st.info("Registra un gasto para ver la gráfica.")
